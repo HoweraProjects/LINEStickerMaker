@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>🍪 暖暖貼圖工坊 · LINE 貼圖製作器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --cream:#fff8f0;
+    --cream-2:#fdeede;
+    --peach:#ffb38a;
+    --peach-deep:#ff9a62;
+    --brown:#7a5743;
+    --brown-soft:#9c7a64;
+    --ink:#4b3a30;
+    --card:#fffdfa;
+    --line:#f0ddca;
+    --green:#7fb77e;
+    --shadow:0 10px 30px rgba(122,87,67,.12);
+    --shadow-sm:0 4px 14px rgba(122,87,67,.10);
+    --radius:22px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Noto Sans TC","Baloo 2",system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #ffe9d6 0%, transparent 55%),
+      radial-gradient(900px 500px at -10% 10%, #ffe2cf 0%, transparent 50%),
+      linear-gradient(180deg,var(--cream) 0%, #fff4e8 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+    line-height:1.65;
+    padding:0 0 60px;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:0 16px;}
+
+  /* Header */
+  header{text-align:center;padding:38px 16px 14px;}
+  .badge{
+    display:inline-flex;align-items:center;gap:7px;
+    background:#fff;border:1px solid var(--line);
+    color:var(--brown-soft);font-size:13px;font-weight:500;
+    padding:6px 14px;border-radius:999px;box-shadow:var(--shadow-sm);
+  }
+  h1{
+    font-family:"Baloo 2","Noto Sans TC",sans-serif;
+    font-size:clamp(28px,7vw,42px);
+    margin:14px 0 6px;color:var(--brown);letter-spacing:.5px;
+  }
+  .subtitle{color:var(--brown-soft);font-size:15px;margin:0 auto;max-width:560px;}
+
+  /* Steps */
+  section.step{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:26px 22px;margin-top:22px;position:relative;overflow:hidden;
+  }
+  section.step::before{
+    content:"";position:absolute;inset:0 0 auto 0;height:5px;
+    background:linear-gradient(90deg,var(--peach),var(--peach-deep));
+  }
+  .step-head{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+  .step-num{
+    flex:none;width:34px;height:34px;border-radius:50%;
+    background:linear-gradient(135deg,var(--peach),var(--peach-deep));
+    color:#fff;font-weight:700;display:grid;place-items:center;
+    font-family:"Baloo 2",sans-serif;box-shadow:0 4px 10px rgba(255,154,98,.4);
+  }
+  .step-head h2{font-size:20px;margin:0;color:var(--brown);font-family:"Baloo 2","Noto Sans TC",sans-serif;}
+  .step-desc{color:var(--brown-soft);font-size:14px;margin:4px 0 18px;}
+
+  /* Controls */
+  .grid-inputs{display:flex;flex-wrap:wrap;gap:14px;}
+  .field{flex:1 1 150px;min-width:140px;}
+  .field label{display:block;font-size:13px;font-weight:500;color:var(--brown-soft);margin-bottom:6px;}
+  .stepper{
+    display:flex;align-items:center;background:var(--cream);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  }
+  .stepper button{
+    width:46px;height:46px;border:none;background:transparent;
+    font-size:22px;color:var(--peach-deep);cursor:pointer;font-weight:700;flex:none;
+    transition:background .15s;
+  }
+  .stepper button:active{background:var(--cream-2);}
+  .stepper input{
+    flex:1;width:100%;border:none;background:transparent;text-align:center;
+    font-size:18px;font-weight:700;color:var(--brown);outline:none;
+    -moz-appearance:textfield;font-family:"Baloo 2",sans-serif;
+  }
+  .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+
+  .info-pills{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;}
+  .pill{
+    background:var(--cream);border:1px dashed var(--line);border-radius:12px;
+    padding:8px 14px;font-size:13px;color:var(--brown-soft);
+  }
+  .pill b{color:var(--brown);font-family:"Baloo 2",sans-serif;font-size:15px;}
+
+  /* Prompt box */
+  .prompt-wrap{margin-top:18px;position:relative;}
+  textarea.prompt{
+    width:100%;min-height:200px;resize:vertical;
+    background:var(--cream);border:1px solid var(--line);border-radius:16px;
+    padding:16px 16px;font-size:13.5px;line-height:1.7;color:var(--ink);
+    font-family:"Noto Sans TC",monospace;outline:none;
+  }
+  textarea.prompt:focus{border-color:var(--peach);}
+  .copy-btn{
+    position:absolute;top:12px;right:12px;
+    background:var(--brown);color:#fff;border:none;border-radius:11px;
+    padding:9px 15px;font-size:13px;font-weight:500;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;box-shadow:var(--shadow-sm);
+    transition:transform .12s,background .2s;
+  }
+  .copy-btn:active{transform:scale(.95);}
+  .copy-btn.done{background:var(--green);}
+  .tip{
+    margin-top:12px;font-size:12.5px;color:var(--brown-soft);
+    background:var(--cream-2);border-radius:12px;padding:10px 14px;
+  }
+  .tip b{color:var(--brown);}
+
+  /* Upload */
+  .dropzone{
+    margin-top:6px;border:2.5px dashed #f1cdaa;border-radius:18px;
+    background:linear-gradient(180deg,#fffaf4,#fff5ea);
+    padding:34px 20px;text-align:center;cursor:pointer;
+    transition:border-color .2s,background .2s,transform .1s;
+  }
+  .dropzone:hover{border-color:var(--peach-deep);background:#fff3e6;}
+  .dropzone.drag{border-color:var(--peach-deep);background:#ffeede;transform:scale(1.01);}
+  .dropzone .emoji{font-size:44px;display:block;margin-bottom:8px;}
+  .dropzone p{margin:4px 0;color:var(--brown);font-weight:500;}
+  .dropzone small{color:var(--brown-soft);}
+
+  .preview-area{margin-top:18px;display:none;}
+  .preview-area.show{display:block;}
+  .canvas-holder{
+    position:relative;border-radius:16px;overflow:hidden;background:
+      repeating-conic-gradient(#f3e6d6 0% 25%, #fffaf3 0% 50%) 50%/22px 22px;
+    border:1px solid var(--line);max-width:100%;
+  }
+  .canvas-holder canvas{display:block;width:100%;height:auto;}
+
+  .adjust{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;}
+  .adjust .field{flex:1 1 220px;}
+  .slider-row{display:flex;align-items:center;gap:10px;}
+  input[type=range]{flex:1;accent-color:var(--peach-deep);height:6px;}
+  .val{font-family:"Baloo 2",sans-serif;font-weight:700;color:var(--brown);min-width:42px;text-align:right;font-size:14px;}
+  .toggle{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:14px;color:var(--brown);font-weight:500;}
+  .toggle input{width:20px;height:20px;accent-color:var(--peach-deep);}
+
+  .btn-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;}
+  .btn{
+    border:none;border-radius:14px;padding:14px 22px;font-size:15px;font-weight:700;
+    cursor:pointer;font-family:"Baloo 2","Noto Sans TC",sans-serif;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    transition:transform .12s,box-shadow .2s,opacity .2s;flex:1 1 200px;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:linear-gradient(135deg,var(--peach),var(--peach-deep));color:#fff;box-shadow:0 8px 20px rgba(255,154,98,.4);}
+  .btn-ghost{background:#fff;color:var(--brown);border:1px solid var(--line);box-shadow:var(--shadow-sm);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+
+  /* Output stickers */
+  .sticker-grid{
+    margin-top:20px;display:grid;gap:14px;
+    grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+  }
+  .sticker-card{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:10px;text-align:center;box-shadow:var(--shadow-sm);
+    transition:transform .15s,box-shadow .2s;
+  }
+  .sticker-card:hover{transform:translateY(-3px);box-shadow:var(--shadow);}
+  .sticker-thumb{
+    width:100%;aspect-ratio:370/320;border-radius:11px;
+    background:repeating-conic-gradient(#f3e6d6 0% 25%, #fffaf3 0% 50%) 50%/14px 14px;
+    display:grid;place-items:center;overflow:hidden;
+  }
+  .sticker-thumb img{max-width:100%;max-height:100%;object-fit:contain;}
+  .mini-dl{
+    margin-top:8px;width:100%;border:none;border-radius:10px;
+    background:var(--cream);color:var(--brown);font-weight:700;
+    padding:8px;font-size:12.5px;cursor:pointer;font-family:"Baloo 2","Noto Sans TC",sans-serif;
+    transition:background .15s;
+  }
+  .mini-dl:active{background:var(--cream-2);}
+  .idx{font-size:11px;color:var(--brown-soft);margin-top:6px;}
+
+  .empty-hint{text-align:center;color:var(--brown-soft);padding:24px;font-size:14px;}
+
+  footer{text-align:center;margin-top:34px;color:var(--brown-soft);font-size:12.5px;line-height:1.9;}
+  footer a{color:var(--peach-deep);text-decoration:none;}
+
+  .hidden{display:none !important;}
+
+  @media (max-width:520px){
+    section.step{padding:22px 16px;border-radius:18px;}
+    .copy-btn{position:static;margin-bottom:10px;}
+    .prompt-wrap{display:flex;flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="badge">🧸 給學生的貼圖小教室</span>
+    <h1>暖暖貼圖工坊</h1>
+    <p class="subtitle">用 GPT 畫一張貼圖組合圖，貼回這裡，自動裁切成一張張可下載的 LINE 貼圖 ✨</p>
+  </header>
+
+  <!-- STEP 1 -->
+  <section class="step">
+    <div class="step-head"><span class="step-num">1</span><h2>設定貼圖數量 & 複製 Prompt</h2></div>
+    <p class="step-desc">先決定要做幾張貼圖（橫 n × 縱 m），下方會自動生成可一鍵複製的 GPT 繪圖咒語。</p>
+
+    <div class="grid-inputs">
+      <div class="field">
+        <label>橫向張數 n（欄）</label>
+        <div class="stepper">
+          <button type="button" data-step="cols" data-d="-1">−</button>
+          <input id="cols" type="number" min="1" max="8" value="3" />
+          <button type="button" data-step="cols" data-d="1">+</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>縱向張數 m（列）</label>
+        <div class="stepper">
+          <button type="button" data-step="rows" data-d="-1">−</button>
+          <input id="rows" type="number" min="1" max="8" value="3" />
+          <button type="button" data-step="rows" data-d="1">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-pills">
+      <span class="pill">貼圖總數：<b id="total">9</b> 張</span>
+      <span class="pill">建議組合圖比例：<b id="ratio">3 : 3</b></span>
+      <span class="pill">每張單格比例：<b>370 : 320</b></span>
+      <span class="pill">建議組合圖尺寸：<b id="sheetdim">1110 × 960</b> px</span>
+    </div>
+
+    <div class="prompt-wrap">
+      <button class="copy-btn" id="copyBtn">📋 一鍵複製</button>
+      <textarea class="prompt" id="promptBox" readonly></textarea>
+    </div>
+    <div class="tip">💡 <b>使用方式：</b>複製上方文字 → 貼到 ChatGPT（或其他 AI 繪圖）→ 把「主題描述」改成自己的角色 → 生成後把整張組合圖存下來，到下方步驟 2 上傳。</div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step">
+    <div class="step-head"><span class="step-num">2</span><h2>貼回圖片 · 自動裁切</h2></div>
+    <p class="step-desc">上傳 / 拖曳 / 貼上（Ctrl+V）GPT 生成的組合圖，系統會依照上面的格數平均裁切。</p>
+
+    <div class="dropzone" id="dropzone">
+      <span class="emoji">🖼️</span>
+      <p>點此選擇圖片，或把圖片拖進來</p>
+      <small>也可以直接 Ctrl+V / ⌘+V 貼上 · 支援 PNG / JPG</small>
+      <input type="file" id="fileInput" accept="image/*" class="hidden" />
+    </div>
+
+    <div class="preview-area" id="previewArea">
+      <div class="canvas-holder">
+        <canvas id="previewCanvas"></canvas>
+      </div>
+
+      <div class="adjust">
+        <div class="field">
+          <label>四邊裁邊（去除外框留白）</label>
+          <div class="slider-row">
+            <input type="range" id="trimOuter" min="0" max="20" value="0" />
+            <span class="val" id="trimOuterVal">0%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>格子間距裁切（去除中間縫隙）</label>
+          <div class="slider-row">
+            <input type="range" id="trimGutter" min="0" max="20" value="4" />
+            <span class="val" id="trimGutterVal">4%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="adjust">
+        <div class="field">
+          <label class="toggle">
+            <input type="checkbox" id="removeBg" checked />
+            自動去背（把白色背景變透明）
+          </label>
+          <div class="slider-row" id="tolRow">
+            <input type="range" id="tol" min="5" max="80" value="32" />
+            <span class="val" id="tolVal">32</span>
+          </div>
+          <small style="color:var(--brown-soft);font-size:12px;">數值越大，去掉的接近白色範圍越多。</small>
+        </div>
+        <div class="field">
+          <label class="toggle">
+            <input type="checkbox" id="autoTrim" checked />
+            自動裁掉透明邊（讓主體置中飽滿）
+          </label>
+          <label class="toggle" style="margin-top:12px;">
+            <input type="checkbox" id="evenMargin" checked />
+            保留約 10px 安全邊距（符合 LINE 規範）
+          </label>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="processBtn">✂️ 開始裁切成貼圖</button>
+        <button class="btn btn-ghost" id="resetBtn">🔄 換一張圖</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step">
+    <div class="step-head"><span class="step-num">3</span><h2>下載貼圖 · 匯入 LINE 拍貼</h2></div>
+    <p class="step-desc">每張都是符合 LINE 規範的透明 PNG（最大 370×320、偶數尺寸）。逐張下載，或一次打包。</p>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="zipBtn" disabled>📦 全部打包下載（ZIP）</button>
+    </div>
+
+    <div id="stickerGrid" class="sticker-grid">
+      <div class="empty-hint">完成步驟 2 後，裁切好的貼圖會出現在這裡 🍵</div>
+    </div>
+
+    <div class="tip" style="margin-top:18px;">
+      📲 <b>匯入 LINE 拍貼：</b>下載貼圖到手機 → 打開「LINE 拍貼」App →「製作貼圖」→ 選擇「自訂貼圖」→ 從相簿選入剛下載的 PNG → 依序加入即可送審或自用。
+    </div>
+  </section>
+
+  <footer>
+    🍪 暖暖貼圖工坊 · 全程在你的瀏覽器中處理，圖片不會上傳到任何伺服器，安心使用。<br/>
+    LINE 貼圖規範參考：
+    <a href="https://creator.line.me/en/guideline/customsticker/" target="_blank" rel="noopener">LINE Custom Stickers Guidelines</a> ·
+    <a href="https://creator.line.me/en/guideline/sticker/" target="_blank" rel="noopener">LINE Creators Market</a>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Step 1: inputs & prompt ----------
+  const colsEl = document.getElementById('cols');
+  const rowsEl = document.getElementById('rows');
+  const totalEl = document.getElementById('total');
+  const ratioEl = document.getElementById('ratio');
+  const sheetdimEl = document.getElementById('sheetdim');
+  const promptBox = document.getElementById('promptBox');
+  const copyBtn = document.getElementById('copyBtn');
+
+  function clampInt(v, lo, hi){
+    v = parseInt(v, 10);
+    if (isNaN(v)) v = lo;
+    return Math.max(lo, Math.min(hi, v));
+  }
+
+  function getNM(){
+    const n = clampInt(colsEl.value, 1, 8);
+    const m = clampInt(rowsEl.value, 1, 8);
+    return {n, m};
+  }
+
+  function buildPrompt(n, m){
+    const total = n * m;
+    const w = n * 370, h = m * 320;
+    return `請幫我畫一張「貼圖組合圖（sticker sheet）」，需求如下：
+
+【版面】
+• 排成整齊的 ${n} 欄 × ${m} 列 網格，共 ${total} 格、${total} 張貼圖。
+• 每一格大小完全一致、平均分布，像九宮格那樣對齊。
+• 整張圖比例請接近 ${w} : ${h}（寬:高），讓每一格維持 370:320 的單張貼圖比例。
+
+【背景與去背】
+• 背景請用「純白色」或「透明」，方便之後自動去背。
+• 角色主體之間請留一點點間距，主體置中、不要超出格線、不要被裁到。
+
+【風格】
+• 日常溫馨、可愛療癒、線條柔和、色調溫暖。
+• 請以「我提供的參考圖」中的角色為主角，造型、配色、畫風都要和參考圖一致。
+• ${total} 張請畫出同一角色的「不同日常情緒／表情／動作」，每一張都不一樣，自由發揮（例如開心、感謝、晚安、加油等日常情境）。
+
+【請避免】
+• 不要加文字浮水印、不要加外框或裝飾邊條、不要在格子間放標題。`;
+  }
+
+  function refresh(){
+    const {n, m} = getNM();
+    colsEl.value = n; rowsEl.value = m;
+    totalEl.textContent = n * m;
+    ratioEl.textContent = n + ' : ' + m;
+    sheetdimEl.textContent = (n*370) + ' × ' + (m*320);
+    promptBox.value = buildPrompt(n, m);
+  }
+
+  document.querySelectorAll('.stepper button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const target = btn.dataset.step === 'cols' ? colsEl : rowsEl;
+      target.value = clampInt(parseInt(target.value,10) + parseInt(btn.dataset.d,10), 1, 8);
+      refresh();
+    });
+  });
+  colsEl.addEventListener('input', refresh);
+  rowsEl.addEventListener('input', refresh);
+  colsEl.addEventListener('blur', refresh);
+  rowsEl.addEventListener('blur', refresh);
+
+  copyBtn.addEventListener('click', async ()=>{
+    try{
+      await navigator.clipboard.writeText(promptBox.value);
+    }catch(e){
+      promptBox.select(); document.execCommand('copy');
+    }
+    copyBtn.classList.add('done');
+    copyBtn.textContent = '✅ 已複製！';
+    setTimeout(()=>{ copyBtn.classList.remove('done'); copyBtn.textContent='📋 一鍵複製'; }, 1600);
+  });
+
+  refresh();
+
+  // ---------- Step 2: image load & preview ----------
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const previewArea = document.getElementById('previewArea');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const pctx = previewCanvas.getContext('2d');
+  const processBtn = document.getElementById('processBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  const trimOuter = document.getElementById('trimOuter');
+  const trimGutter = document.getElementById('trimGutter');
+  const trimOuterVal = document.getElementById('trimOuterVal');
+  const trimGutterVal = document.getElementById('trimGutterVal');
+  const removeBg = document.getElementById('removeBg');
+  const tol = document.getElementById('tol');
+  const tolVal = document.getElementById('tolVal');
+  const tolRow = document.getElementById('tolRow');
+  const autoTrim = document.getElementById('autoTrim');
+  const evenMargin = document.getElementById('evenMargin');
+
+  let sourceImg = null;
+
+  function showPreview(){
+    if(!sourceImg) return;
+    const maxW = 820;
+    const scale = Math.min(1, maxW / sourceImg.width);
+    previewCanvas.width = Math.round(sourceImg.width * scale);
+    previewCanvas.height = Math.round(sourceImg.height * scale);
+    drawPreviewOverlay();
+    previewArea.classList.add('show');
+  }
+
+  function drawPreviewOverlay(){
+    if(!sourceImg) return;
+    const W = previewCanvas.width, H = previewCanvas.height;
+    pctx.clearRect(0,0,W,H);
+    pctx.drawImage(sourceImg, 0, 0, W, H);
+
+    const {n, m} = getNM();
+    const outer = parseInt(trimOuter.value,10)/100;
+    const gutter = parseInt(trimGutter.value,10)/100;
+
+    // draw cell crop rectangles
+    pctx.lineWidth = 2;
+    pctx.strokeStyle = 'rgba(255,154,98,.95)';
+    pctx.setLineDash([7,5]);
+    const cellW = W / n, cellH = H / m;
+    for(let r=0;r<m;r++){
+      for(let c=0;c<n;c++){
+        const x = c*cellW, y = r*cellH;
+        const insetX = cellW*outer + cellW*gutter*0.5;
+        const insetY = cellH*outer + cellH*gutter*0.5;
+        pctx.strokeRect(x+insetX, y+insetY, cellW-insetX*2, cellH-insetY*2);
+      }
+    }
+    pctx.setLineDash([]);
+  }
+
+  function loadFile(file){
+    if(!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{ sourceImg = img; showPreview(); URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+
+  dropzone.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', e=> loadFile(e.target.files[0]));
+
+  ['dragenter','dragover'].forEach(ev=> dropzone.addEventListener(ev, e=>{
+    e.preventDefault(); dropzone.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev=> dropzone.addEventListener(ev, e=>{
+    e.preventDefault(); dropzone.classList.remove('drag');
+  }));
+  dropzone.addEventListener('drop', e=>{
+    if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  });
+
+  window.addEventListener('paste', e=>{
+    const items = e.clipboardData && e.clipboardData.items;
+    if(!items) return;
+    for(const it of items){
+      if(it.type.startsWith('image/')){ loadFile(it.getAsFile()); break; }
+    }
+  });
+
+  [trimOuter, trimGutter].forEach(s=> s.addEventListener('input', ()=>{
+    trimOuterVal.textContent = trimOuter.value + '%';
+    trimGutterVal.textContent = trimGutter.value + '%';
+    drawPreviewOverlay();
+  }));
+  colsEl.addEventListener('input', drawPreviewOverlay);
+  rowsEl.addEventListener('input', drawPreviewOverlay);
+  document.querySelectorAll('.stepper button').forEach(b=> b.addEventListener('click', drawPreviewOverlay));
+
+  removeBg.addEventListener('change', ()=>{ tolRow.style.opacity = removeBg.checked ? 1 : .35; });
+  tol.addEventListener('input', ()=> tolVal.textContent = tol.value);
+
+  resetBtn.addEventListener('click', ()=>{
+    sourceImg = null; previewArea.classList.remove('show'); fileInput.value='';
+  });
+
+  // ---------- Step 3: crop + process ----------
+  const stickerGrid = document.getElementById('stickerGrid');
+  const zipBtn = document.getElementById('zipBtn');
+  let stickerBlobs = []; // {blob, name}
+
+  // flood-fill transparency from edges based on background color similarity
+  function removeBackground(canvas, tolerance){
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const img = ctx.getImageData(0,0,W,H);
+    const data = img.data;
+    // reference bg = average of 4 corners
+    function px(x,y){ const i=(y*W+x)*4; return [data[i],data[i+1],data[i+2]]; }
+    const corners = [px(0,0), px(W-1,0), px(0,H-1), px(W-1,H-1)];
+    const bg = [0,0,0];
+    corners.forEach(c=>{ bg[0]+=c[0]; bg[1]+=c[1]; bg[2]+=c[2]; });
+    bg[0]/=4; bg[1]/=4; bg[2]/=4;
+    const tol2 = (tolerance*tolerance)*3;
+
+    const visited = new Uint8Array(W*H);
+    const stack = [];
+    function maybePush(x,y){
+      if(x<0||y<0||x>=W||y>=H) return;
+      const idx = y*W+x;
+      if(visited[idx]) return;
+      visited[idx]=1;
+      const i = idx*4;
+      const dr=data[i]-bg[0], dg=data[i+1]-bg[1], db=data[i+2]-bg[2];
+      if(dr*dr+dg*dg+db*db <= tol2){
+        data[i+3]=0; // transparent
+        stack.push(x,y);
+      }
+    }
+    for(let x=0;x<W;x++){ maybePush(x,0); maybePush(x,H-1); }
+    for(let y=0;y<H;y++){ maybePush(0,y); maybePush(W-1,y); }
+    while(stack.length){
+      const y = stack.pop(), x = stack.pop();
+      maybePush(x+1,y); maybePush(x-1,y); maybePush(x,y+1); maybePush(x,y-1);
+    }
+    ctx.putImageData(img,0,0);
+  }
+
+  // find bounding box of non-transparent pixels
+  function contentBounds(canvas){
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const data = ctx.getImageData(0,0,W,H).data;
+    let minX=W, minY=H, maxX=-1, maxY=-1;
+    for(let y=0;y<H;y++){
+      for(let x=0;x<W;x++){
+        if(data[(y*W+x)*4+3] > 12){
+          if(x<minX)minX=x; if(x>maxX)maxX=x;
+          if(y<minY)minY=y; if(y>maxY)maxY=y;
+        }
+      }
+    }
+    if(maxX<0) return null;
+    return {minX, minY, maxX, maxY};
+  }
+
+  function toEven(v){ v = Math.round(v); return v % 2 === 0 ? v : v-1; }
+
+  function makeStickerCanvas(cellCanvas){
+    let work = cellCanvas;
+
+    if(removeBg.checked){
+      removeBackground(work, parseInt(tol.value,10));
+    }
+
+    // auto-trim transparent borders
+    let cropped = work;
+    if(autoTrim.checked){
+      const b = contentBounds(work);
+      if(b){
+        const cw = b.maxX-b.minX+1, ch = b.maxY-b.minY+1;
+        const tmp = document.createElement('canvas');
+        tmp.width = cw; tmp.height = ch;
+        tmp.getContext('2d').drawImage(work, b.minX, b.minY, cw, ch, 0,0, cw, ch);
+        cropped = tmp;
+      }
+    }
+
+    // fit within LINE 370x320, keep aspect ratio, add safe margin
+    const MAXW = 370, MAXH = 320;
+    const margin = evenMargin.checked ? 10 : 0;
+    const availW = MAXW - margin*2, availH = MAXH - margin*2;
+    const cw = cropped.width, ch = cropped.height;
+    const scale = Math.min(availW/cw, availH/ch);
+    const drawW = cw*scale, drawH = ch*scale;
+
+    let outW = toEven(drawW + margin*2);
+    let outH = toEven(drawH + margin*2);
+    outW = Math.max(2, Math.min(MAXW, outW));
+    outH = Math.max(2, Math.min(MAXH, outH));
+
+    const out = document.createElement('canvas');
+    out.width = outW; out.height = outH;
+    const octx = out.getContext('2d');
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = 'high';
+    octx.drawImage(cropped, (outW-drawW)/2, (outH-drawH)/2, drawW, drawH);
+    return out;
+  }
+
+  function process(){
+    if(!sourceImg) return;
+    const {n, m} = getNM();
+    const total = n*m;
+    const outer = parseInt(trimOuter.value,10)/100;
+    const gutter = parseInt(trimGutter.value,10)/100;
+
+    // draw source at native resolution for best quality
+    const src = document.createElement('canvas');
+    src.width = sourceImg.width; src.height = sourceImg.height;
+    src.getContext('2d').drawImage(sourceImg,0,0);
+
+    const cellW = sourceImg.width / n;
+    const cellH = sourceImg.height / m;
+
+    stickerGrid.innerHTML = '';
+    stickerBlobs = [];
+    processBtn.disabled = true;
+    processBtn.textContent = '⏳ 處理中…';
+
+    let pending = total;
+    let count = 0;
+
+    for(let r=0;r<m;r++){
+      for(let c=0;c<n;c++){
+        count++;
+        const idx = count;
+        const insetX = cellW*outer + cellW*gutter*0.5;
+        const insetY = cellH*outer + cellH*gutter*0.5;
+        const sx = c*cellW + insetX;
+        const sy = r*cellH + insetY;
+        const sw = cellW - insetX*2;
+        const sh = cellH - insetY*2;
+
+        const cell = document.createElement('canvas');
+        cell.width = Math.max(2, Math.round(sw));
+        cell.height = Math.max(2, Math.round(sh));
+        cell.getContext('2d').drawImage(src, sx, sy, sw, sh, 0,0, cell.width, cell.height);
+
+        const finalCanvas = makeStickerCanvas(cell);
+        const name = 'sticker_' + String(idx).padStart(2,'0') + '.png';
+
+        // build card
+        const card = document.createElement('div');
+        card.className = 'sticker-card';
+        const thumb = document.createElement('div');
+        thumb.className = 'sticker-thumb';
+        const imgEl = document.createElement('img');
+        thumb.appendChild(imgEl);
+        const dl = document.createElement('button');
+        dl.className = 'mini-dl';
+        dl.textContent = '⬇ 下載 PNG';
+        const idxLabel = document.createElement('div');
+        idxLabel.className = 'idx';
+        idxLabel.textContent = finalCanvas.width + '×' + finalCanvas.height + ' px';
+        card.appendChild(thumb); card.appendChild(dl); card.appendChild(idxLabel);
+        stickerGrid.appendChild(card);
+
+        finalCanvas.toBlob(blob=>{
+          const url = URL.createObjectURL(blob);
+          imgEl.src = url;
+          stickerBlobs.push({blob, name, order: idx});
+          dl.addEventListener('click', ()=>{
+            const a = document.createElement('a');
+            a.href = url; a.download = name; a.click();
+          });
+          pending--;
+          if(pending===0) finishProcess();
+        }, 'image/png');
+      }
+    }
+  }
+
+  function finishProcess(){
+    stickerBlobs.sort((a,b)=>a.order-b.order);
+    processBtn.disabled = false;
+    processBtn.textContent = '✂️ 開始裁切成貼圖';
+    zipBtn.disabled = stickerBlobs.length===0 || typeof JSZip==='undefined';
+    document.querySelector('.step:last-of-type').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  processBtn.addEventListener('click', process);
+
+  zipBtn.addEventListener('click', async ()=>{
+    if(typeof JSZip==='undefined' || !stickerBlobs.length) return;
+    zipBtn.disabled = true; const orig = zipBtn.textContent; zipBtn.textContent='📦 打包中…';
+    const zip = new JSZip();
+    const folder = zip.folder('line_stickers');
+    stickerBlobs.forEach(s=> folder.file(s.name, s.blob));
+    const content = await zip.generateAsync({type:'blob'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(content);
+    a.download = 'line_stickers.zip';
+    a.click();
+    zipBtn.disabled = false; zipBtn.textContent = orig;
+  });
+
+})();
+</script>
+</body>
+</html>
