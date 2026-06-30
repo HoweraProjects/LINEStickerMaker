@@ -148,7 +148,16 @@
       repeating-conic-gradient(#f3e6d6 0% 25%, #fffaf3 0% 50%) 50%/22px 22px;
     border:1px solid var(--line);max-width:100%;
   }
-  .canvas-holder canvas{display:block;width:100%;height:auto;}
+  .canvas-holder canvas{display:block;width:100%;height:auto;touch-action:none;cursor:grab;}
+  .crop-hint{
+    font-size:12.5px;color:var(--brown-soft);background:var(--cream-2);
+    border-radius:12px;padding:10px 14px;margin-bottom:10px;line-height:1.6;
+  }
+  .crop-hint b{color:var(--brown);}
+  .link-btn{
+    background:none;border:none;color:var(--peach-deep);font-weight:700;cursor:pointer;
+    font-family:inherit;font-size:12.5px;padding:0 0 0 4px;text-decoration:underline;
+  }
 
   .adjust{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;}
   .adjust .field{flex:1 1 220px;}
@@ -299,6 +308,10 @@
     </div>
 
     <div class="preview-area" id="previewArea">
+      <div class="crop-hint">
+        🖱️ <b>拖曳裁切框中間</b>可移動位置（調整邊距）；<b>拉四角／四邊的小圓點</b>可縮放，框內所有格子會一起跟著變動。
+        <button type="button" id="resetCropBtn" class="link-btn">↺ 重設裁切框</button>
+      </div>
       <div class="canvas-holder">
         <canvas id="previewCanvas"></canvas>
       </div>
@@ -524,16 +537,25 @@
   let sourceImg = null;
   let captionPosition = 'bottom';
 
-  // centered crop rectangle so the sheet matches the n*370 : m*320 target ratio
-  function getCropRect(imgW, imgH, n, m){
-    if(!fitRatio.checked) return {cx:0, cy:0, cw:imgW, ch:imgH};
+  // crop frame, stored in IMAGE pixel coordinates {x,y,w,h}
+  let cropRect = null;
+  let cropManual = false;     // true once user has dragged the frame
+  let previewScale = 1;       // canvas-buffer px per image px
+  const HANDLE = 9;           // handle radius in canvas-buffer px
+
+  // default centered crop so the sheet matches the n*370 : m*320 target ratio
+  function defaultCropRect(){
+    const imgW = sourceImg.width, imgH = sourceImg.height;
+    const {n, m} = getNM();
+    if(!fitRatio.checked) return {x:0, y:0, w:imgW, h:imgH};
     const target = (n*370) / (m*320);
     const imgRatio = imgW / imgH;
-    let cw, ch;
-    if(imgRatio > target){ ch = imgH; cw = imgH * target; }
-    else { cw = imgW; ch = imgW / target; }
-    return {cx:(imgW-cw)/2, cy:(imgH-ch)/2, cw, ch};
+    let w, h;
+    if(imgRatio > target){ h = imgH; w = imgH * target; }
+    else { w = imgW; h = imgW / target; }
+    return {x:(imgW-w)/2, y:(imgH-h)/2, w, h};
   }
+  function resetCropRect(){ cropRect = defaultCropRect(); cropManual = false; }
 
   function showPreview(){
     if(!sourceImg) return;
@@ -541,12 +563,14 @@
     const scale = Math.min(1, maxW / sourceImg.width);
     previewCanvas.width = Math.round(sourceImg.width * scale);
     previewCanvas.height = Math.round(sourceImg.height * scale);
+    previewScale = previewCanvas.width / sourceImg.width;
+    resetCropRect();
     drawPreviewOverlay();
     previewArea.classList.add('show');
   }
 
   function drawPreviewOverlay(){
-    if(!sourceImg) return;
+    if(!sourceImg || !cropRect) return;
     const W = previewCanvas.width, H = previewCanvas.height;
     pctx.clearRect(0,0,W,H);
     pctx.drawImage(sourceImg, 0, 0, W, H);
@@ -555,33 +579,56 @@
     const outer = parseInt(trimOuter.value,10)/100;
     const gutter = parseInt(trimGutter.value,10)/100;
 
-    // crop region (scaled to preview canvas) that matches the target ratio
-    const cr = getCropRect(W, H, n, m);
+    // crop rect → canvas-buffer coords
+    const bx = cropRect.x*previewScale, by = cropRect.y*previewScale;
+    const bw = cropRect.w*previewScale, bh = cropRect.h*previewScale;
 
     // shade away the part that will be cropped off
-    if(cr.cw < W - 0.5 || cr.ch < H - 0.5){
-      pctx.fillStyle = 'rgba(75,58,48,.45)';
-      // top, bottom, left, right bands around the crop rect
-      pctx.fillRect(0, 0, W, cr.cy);
-      pctx.fillRect(0, cr.cy+cr.ch, W, H-(cr.cy+cr.ch));
-      pctx.fillRect(0, cr.cy, cr.cx, cr.ch);
-      pctx.fillRect(cr.cx+cr.cw, cr.cy, W-(cr.cx+cr.cw), cr.ch);
-    }
+    pctx.fillStyle = 'rgba(75,58,48,.5)';
+    pctx.fillRect(0, 0, W, by);
+    pctx.fillRect(0, by+bh, W, H-(by+bh));
+    pctx.fillRect(0, by, bx, bh);
+    pctx.fillRect(bx+bw, by, W-(bx+bw), bh);
 
-    // draw cell crop rectangles inside the kept region
+    // inner cell rectangles (these all move together when the frame changes)
     pctx.lineWidth = 2;
     pctx.strokeStyle = 'rgba(255,154,98,.95)';
     pctx.setLineDash([7,5]);
-    const cellW = cr.cw / n, cellH = cr.ch / m;
+    const cellW = bw / n, cellH = bh / m;
     for(let r=0;r<m;r++){
       for(let c=0;c<n;c++){
-        const x = cr.cx + c*cellW, y = cr.cy + r*cellH;
+        const x = bx + c*cellW, y = by + r*cellH;
         const insetX = cellW*outer + cellW*gutter*0.5;
         const insetY = cellH*outer + cellH*gutter*0.5;
         pctx.strokeRect(x+insetX, y+insetY, cellW-insetX*2, cellH-insetY*2);
       }
     }
     pctx.setLineDash([]);
+
+    // outer frame border
+    pctx.lineWidth = 2.5;
+    pctx.strokeStyle = '#ff7a3c';
+    pctx.strokeRect(bx, by, bw, bh);
+
+    // 8 round handles
+    pctx.fillStyle = '#ffffff';
+    pctx.strokeStyle = '#ff7a3c';
+    pctx.lineWidth = 2.5;
+    handlePoints(bx, by, bw, bh).forEach(p=>{
+      pctx.beginPath();
+      pctx.arc(p.x, p.y, HANDLE, 0, Math.PI*2);
+      pctx.fill(); pctx.stroke();
+    });
+  }
+
+  // handle centre points in buffer coords, keyed by resize direction
+  function handlePoints(bx, by, bw, bh){
+    const mx = bx+bw/2, my = by+bh/2;
+    return [
+      {dir:'nw', x:bx,    y:by},    {dir:'n', x:mx,    y:by},    {dir:'ne', x:bx+bw, y:by},
+      {dir:'w',  x:bx,    y:my},                                   {dir:'e',  x:bx+bw, y:my},
+      {dir:'sw', x:bx,    y:by+bh}, {dir:'s', x:mx,    y:by+bh}, {dir:'se', x:bx+bw, y:by+bh}
+    ];
   }
 
   function loadFile(file){
@@ -613,19 +660,94 @@
     }
   });
 
+  // re-fit the frame to the new ratio only if the user hasn't manually moved it
+  function gridChanged(){
+    if(sourceImg && !cropManual) resetCropRect();
+    if(sourceImg) drawPreviewOverlay();
+  }
+
   [trimOuter, trimGutter].forEach(s=> s.addEventListener('input', ()=>{
     trimOuterVal.textContent = trimOuter.value + '%';
     trimGutterVal.textContent = trimGutter.value + '%';
-    drawPreviewOverlay();
+    if(sourceImg) drawPreviewOverlay();
   }));
-  colsEl.addEventListener('input', drawPreviewOverlay);
-  rowsEl.addEventListener('input', drawPreviewOverlay);
-  document.querySelectorAll('.stepper button').forEach(b=> b.addEventListener('click', drawPreviewOverlay));
+  colsEl.addEventListener('input', gridChanged);
+  rowsEl.addEventListener('input', gridChanged);
+  document.querySelectorAll('.stepper button').forEach(b=> b.addEventListener('click', gridChanged));
 
   removeBg.addEventListener('change', ()=>{ tolRow.style.opacity = removeBg.checked ? 1 : .35; });
   tol.addEventListener('input', ()=> tolVal.textContent = tol.value);
   pad.addEventListener('input', ()=> padVal.textContent = pad.value);
-  fitRatio.addEventListener('change', drawPreviewOverlay);
+  fitRatio.addEventListener('change', ()=>{ if(sourceImg){ resetCropRect(); drawPreviewOverlay(); } });
+  document.getElementById('resetCropBtn').addEventListener('click', ()=>{
+    if(sourceImg){ resetCropRect(); drawPreviewOverlay(); }
+  });
+
+  // ----- interactive crop frame (drag to move / resize) -----
+  let drag = null;
+  const cursorFor = {nw:'nwse-resize', se:'nwse-resize', ne:'nesw-resize', sw:'nesw-resize',
+                     n:'ns-resize', s:'ns-resize', e:'ew-resize', w:'ew-resize', move:'grab'};
+
+  function pointerToImg(e){
+    const rect = previewCanvas.getBoundingClientRect();
+    const bx = (e.clientX - rect.left) * (previewCanvas.width / rect.width);
+    const by = (e.clientY - rect.top) * (previewCanvas.height / rect.height);
+    return {x: bx/previewScale, y: by/previewScale};
+  }
+  function hitTest(p){
+    if(!cropRect) return null;
+    const bx=cropRect.x*previewScale, by=cropRect.y*previewScale;
+    const bw=cropRect.w*previewScale, bh=cropRect.h*previewScale;
+    const px=p.x*previewScale, py=p.y*previewScale, tol=HANDLE+5;
+    for(const h of handlePoints(bx,by,bw,bh)){
+      if(Math.abs(px-h.x)<=tol && Math.abs(py-h.y)<=tol) return h.dir;
+    }
+    if(px>=bx && px<=bx+bw && py>=by && py<=by+bh) return 'move';
+    return null;
+  }
+  previewCanvas.addEventListener('pointerdown', e=>{
+    if(!cropRect) return;
+    const mode = hitTest(pointerToImg(e));
+    if(!mode) return;
+    e.preventDefault();
+    try{ previewCanvas.setPointerCapture(e.pointerId); }catch(_){}
+    drag = {mode, start: pointerToImg(e), startRect: Object.assign({}, cropRect)};
+    previewCanvas.style.cursor = mode==='move' ? 'grabbing' : cursorFor[mode];
+  });
+  previewCanvas.addEventListener('pointermove', e=>{
+    if(!drag){
+      const dir = hitTest(pointerToImg(e));
+      previewCanvas.style.cursor = dir ? cursorFor[dir] : 'default';
+      return;
+    }
+    e.preventDefault();
+    const p = pointerToImg(e);
+    const dx = p.x - drag.start.x, dy = p.y - drag.start.y;
+    const sr = drag.startRect, imgW = sourceImg.width, imgH = sourceImg.height, MIN = 24;
+    let r = Object.assign({}, sr);
+    if(drag.mode === 'move'){
+      r.x = Math.max(0, Math.min(imgW - sr.w, sr.x + dx));
+      r.y = Math.max(0, Math.min(imgH - sr.h, sr.y + dy));
+    } else {
+      let x1=sr.x, y1=sr.y, x2=sr.x+sr.w, y2=sr.y+sr.h;
+      if(drag.mode.indexOf('w')>=0) x1 = Math.max(0, Math.min(x2-MIN, sr.x+dx));
+      if(drag.mode.indexOf('e')>=0) x2 = Math.min(imgW, Math.max(x1+MIN, sr.x+sr.w+dx));
+      if(drag.mode.indexOf('n')>=0) y1 = Math.max(0, Math.min(y2-MIN, sr.y+dy));
+      if(drag.mode.indexOf('s')>=0) y2 = Math.min(imgH, Math.max(y1+MIN, sr.y+sr.h+dy));
+      r = {x:x1, y:y1, w:x2-x1, h:y2-y1};
+    }
+    cropRect = r; cropManual = true;
+    drawPreviewOverlay();
+  });
+  function endDrag(e){
+    if(!drag) return;
+    try{ previewCanvas.releasePointerCapture(e.pointerId); }catch(_){}
+    drag = null;
+    previewCanvas.style.cursor = 'default';
+  }
+  previewCanvas.addEventListener('pointerup', endDrag);
+  previewCanvas.addEventListener('pointercancel', endDrag);
+  previewCanvas.addEventListener('pointerleave', ()=>{ if(!drag) previewCanvas.style.cursor='default'; });
   captionPos.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
     captionPos.querySelectorAll('button').forEach(x=> x.classList.remove('active'));
     b.classList.add('active');
@@ -822,10 +944,10 @@
     src.width = sourceImg.width; src.height = sourceImg.height;
     src.getContext('2d').drawImage(sourceImg,0,0);
 
-    // crop the sheet to the correct target ratio, THEN slice into n×m cells
-    const cr = getCropRect(sourceImg.width, sourceImg.height, n, m);
-    const cellW = cr.cw / n;
-    const cellH = cr.ch / m;
+    // use the interactive crop frame (image coords), THEN slice into n×m cells
+    const cr = cropRect || defaultCropRect();
+    const cellW = cr.w / n;
+    const cellH = cr.h / m;
 
     stickers.forEach(s=>{ if(s.url) URL.revokeObjectURL(s.url); });
     stickerGrid.innerHTML = '';
@@ -840,8 +962,8 @@
         const idx = count;
         const insetX = cellW*outer + cellW*gutter*0.5;
         const insetY = cellH*outer + cellH*gutter*0.5;
-        const sx = cr.cx + c*cellW + insetX;
-        const sy = cr.cy + r*cellH + insetY;
+        const sx = cr.x + c*cellW + insetX;
+        const sy = cr.y + r*cellH + insetY;
         const sw = cellW - insetX*2;
         const sh = cellH - insetY*2;
 
