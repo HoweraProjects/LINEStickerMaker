@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --cream:#fff8f0;
@@ -197,6 +198,22 @@
 
   .empty-hint{text-align:center;color:var(--brown-soft);padding:24px;font-size:14px;}
 
+  /* QR card */
+  .qr-card{text-align:center;}
+  .qr-card .step-head{justify-content:center;}
+  .qr-box{
+    display:inline-block;background:#fff;border:1px solid var(--line);
+    border-radius:18px;padding:16px;box-shadow:var(--shadow-sm);margin-top:6px;
+  }
+  .qr-box canvas,.qr-box img{display:block;border-radius:8px;width:188px;height:188px;}
+  .qr-url{
+    margin-top:14px;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
+    background:var(--cream);border:1px solid var(--line);border-radius:12px;
+    padding:8px 12px;font-size:13px;color:var(--brown);word-break:break-all;
+  }
+  .qr-url a{color:var(--peach-deep);text-decoration:none;font-weight:500;}
+  .qr-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;}
+
   footer{text-align:center;margin-top:34px;color:var(--brown-soft);font-size:12.5px;line-height:1.9;}
   footer a{color:var(--peach-deep);text-decoration:none;}
 
@@ -335,6 +352,20 @@
 
     <div class="tip" style="margin-top:18px;">
       📲 <b>匯入 LINE 拍貼：</b>下載貼圖到手機 → 打開「LINE 拍貼」App →「製作貼圖」→ 選擇「自訂貼圖」→ 從相簿選入剛下載的 PNG → 依序加入即可送審或自用。
+    </div>
+  </section>
+
+  <!-- QR share -->
+  <section class="step qr-card">
+    <div class="step-head"><h2>📱 分享給學生 · 掃描開啟</h2></div>
+    <p class="step-desc">投影或展示這個 QR Code，學生用手機相機一掃就能打開這個工具。</p>
+    <div class="qr-box" id="qrBox"></div>
+    <div class="qr-url">
+      🔗 <a id="qrLink" href="#" target="_blank" rel="noopener"></a>
+    </div>
+    <div class="qr-actions">
+      <button class="btn btn-ghost" id="qrDownload" style="flex:0 1 auto;">⬇ 下載 QR 圖檔</button>
+      <button class="btn btn-ghost" id="qrCopy" style="flex:0 1 auto;">📋 複製連結</button>
     </div>
   </section>
 
@@ -717,6 +748,43 @@
   }
 
   processBtn.addEventListener('click', process);
+
+  // ---------- QR code share ----------
+  (function initQR(){
+    const SITE_URL = location.protocol.indexOf('http') === 0
+      ? location.href.split('#')[0].split('?')[0]
+      : 'https://howeraprojects.github.io/LINEStickerMaker/';
+    const box = document.getElementById('qrBox');
+    const link = document.getElementById('qrLink');
+    link.textContent = SITE_URL; link.href = SITE_URL;
+
+    if(typeof QRCode !== 'undefined'){
+      new QRCode(box, {
+        text: SITE_URL, width: 376, height: 376,
+        colorDark: '#4b3a30', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    function getQrDataURL(){
+      const cv = box.querySelector('canvas');
+      if(cv) return cv.toDataURL('image/png');
+      const im = box.querySelector('img');
+      return im ? im.src : null;
+    }
+    document.getElementById('qrDownload').addEventListener('click', ()=>{
+      const url = getQrDataURL();
+      if(!url) return;
+      const a = document.createElement('a');
+      a.href = url; a.download = 'sticker-maker-qrcode.png'; a.click();
+    });
+    document.getElementById('qrCopy').addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      try{ await navigator.clipboard.writeText(SITE_URL); }catch(_){}
+      const t = btn.textContent; btn.textContent = '✅ 已複製';
+      setTimeout(()=> btn.textContent = t, 1500);
+    });
+  })();
 
   zipBtn.addEventListener('click', async ()=>{
     if(typeof JSZip==='undefined' || !stickerBlobs.length) return;
