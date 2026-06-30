@@ -158,6 +158,13 @@
   .toggle{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:14px;color:var(--brown);font-weight:500;}
   .toggle input{width:20px;height:20px;accent-color:var(--peach-deep);}
 
+  .seg{display:inline-flex;background:var(--cream);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .seg button{
+    border:none;background:transparent;padding:10px 16px;font-size:13.5px;font-weight:500;
+    color:var(--brown-soft);cursor:pointer;font-family:"Noto Sans TC",sans-serif;transition:background .15s,color .15s;
+  }
+  .seg button.active{background:linear-gradient(135deg,var(--peach),var(--peach-deep));color:#fff;font-weight:700;}
+
   .btn-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;}
   .btn{
     border:none;border-radius:14px;padding:14px 22px;font-size:15px;font-weight:700;
@@ -195,6 +202,13 @@
   }
   .mini-dl:active{background:var(--cream-2);}
   .idx{font-size:11px;color:var(--brown-soft);margin-top:6px;}
+  .caption-input{
+    margin-top:8px;width:100%;border:1px solid var(--line);border-radius:10px;
+    padding:7px 9px;font-size:13px;color:var(--ink);background:var(--cream);
+    font-family:"Noto Sans TC",sans-serif;outline:none;text-align:center;
+  }
+  .caption-input:focus{border-color:var(--peach);background:#fff;}
+  .caption-input::placeholder{color:#c7b3a2;}
 
   .empty-hint{text-align:center;color:var(--brown-soft);padding:24px;font-size:14px;}
 
@@ -309,6 +323,17 @@
       <div class="adjust">
         <div class="field">
           <label class="toggle">
+            <input type="checkbox" id="fitRatio" checked />
+            上傳自動裁切成正確比例（每格 370:320）
+          </label>
+          <small style="color:var(--brown-soft);font-size:12px;">開啟後會依目前格數把圖置中裁成正確比例，不會硬除造成變形。</small>
+          <label class="toggle" style="margin-top:14px;">
+            <input type="checkbox" id="autoTrim" checked />
+            自動裁掉透明邊（讓主體置中飽滿）
+          </label>
+        </div>
+        <div class="field">
+          <label class="toggle">
             <input type="checkbox" id="removeBg" checked />
             自動去背（把白色背景變透明）
           </label>
@@ -318,15 +343,25 @@
           </div>
           <small style="color:var(--brown-soft);font-size:12px;">數值越大，去掉的接近白色範圍越多。</small>
         </div>
+      </div>
+
+      <div class="adjust">
         <div class="field">
-          <label class="toggle">
-            <input type="checkbox" id="autoTrim" checked />
-            自動裁掉透明邊（讓主體置中飽滿）
-          </label>
-          <label class="toggle" style="margin-top:12px;">
-            <input type="checkbox" id="evenMargin" checked />
-            保留約 10px 安全邊距（符合 LINE 規範）
-          </label>
+          <label>貼圖四周留白（必須留白，px）</label>
+          <div class="slider-row">
+            <input type="range" id="pad" min="6" max="60" value="14" />
+            <span class="val" id="padVal">14</span>
+          </div>
+          <small style="color:var(--brown-soft);font-size:12px;">符合 LINE 規範（內容四周約留 10px 以上），也讓配文有空間。</small>
+        </div>
+        <div class="field">
+          <label>配文位置</label>
+          <div class="seg" id="captionPos">
+            <button type="button" data-pos="bottom" class="active">下方</button>
+            <button type="button" data-pos="top">上方</button>
+            <button type="button" data-pos="none">不顯示</button>
+          </div>
+          <small style="color:var(--brown-soft);font-size:12px;">裁切後可在每張貼圖下方輸入配文，文字會直接合成進 PNG。</small>
         </div>
       </div>
 
@@ -340,7 +375,7 @@
   <!-- STEP 3 -->
   <section class="step">
     <div class="step-head"><span class="step-num">3</span><h2>下載貼圖 · 匯入 LINE 拍貼</h2></div>
-    <p class="step-desc">每張都是符合 LINE 規範的透明 PNG（最大 370×320、偶數尺寸）。逐張下載，或一次打包。</p>
+    <p class="step-desc">每張都是符合 LINE 規範的透明 PNG（最大 370×320、偶數尺寸）。可在每張下方輸入「配文」，文字會即時合成進圖片，再逐張下載或一次打包。</p>
 
     <div class="btn-row">
       <button class="btn btn-primary" id="zipBtn" disabled>📦 全部打包下載（ZIP）</button>
@@ -477,9 +512,24 @@
   const tolVal = document.getElementById('tolVal');
   const tolRow = document.getElementById('tolRow');
   const autoTrim = document.getElementById('autoTrim');
-  const evenMargin = document.getElementById('evenMargin');
+  const fitRatio = document.getElementById('fitRatio');
+  const pad = document.getElementById('pad');
+  const padVal = document.getElementById('padVal');
+  const captionPos = document.getElementById('captionPos');
 
   let sourceImg = null;
+  let captionPosition = 'bottom';
+
+  // centered crop rectangle so the sheet matches the n*370 : m*320 target ratio
+  function getCropRect(imgW, imgH, n, m){
+    if(!fitRatio.checked) return {cx:0, cy:0, cw:imgW, ch:imgH};
+    const target = (n*370) / (m*320);
+    const imgRatio = imgW / imgH;
+    let cw, ch;
+    if(imgRatio > target){ ch = imgH; cw = imgH * target; }
+    else { cw = imgW; ch = imgW / target; }
+    return {cx:(imgW-cw)/2, cy:(imgH-ch)/2, cw, ch};
+  }
 
   function showPreview(){
     if(!sourceImg) return;
@@ -501,14 +551,27 @@
     const outer = parseInt(trimOuter.value,10)/100;
     const gutter = parseInt(trimGutter.value,10)/100;
 
-    // draw cell crop rectangles
+    // crop region (scaled to preview canvas) that matches the target ratio
+    const cr = getCropRect(W, H, n, m);
+
+    // shade away the part that will be cropped off
+    if(cr.cw < W - 0.5 || cr.ch < H - 0.5){
+      pctx.fillStyle = 'rgba(75,58,48,.45)';
+      // top, bottom, left, right bands around the crop rect
+      pctx.fillRect(0, 0, W, cr.cy);
+      pctx.fillRect(0, cr.cy+cr.ch, W, H-(cr.cy+cr.ch));
+      pctx.fillRect(0, cr.cy, cr.cx, cr.ch);
+      pctx.fillRect(cr.cx+cr.cw, cr.cy, W-(cr.cx+cr.cw), cr.ch);
+    }
+
+    // draw cell crop rectangles inside the kept region
     pctx.lineWidth = 2;
     pctx.strokeStyle = 'rgba(255,154,98,.95)';
     pctx.setLineDash([7,5]);
-    const cellW = W / n, cellH = H / m;
+    const cellW = cr.cw / n, cellH = cr.ch / m;
     for(let r=0;r<m;r++){
       for(let c=0;c<n;c++){
-        const x = c*cellW, y = r*cellH;
+        const x = cr.cx + c*cellW, y = cr.cy + r*cellH;
         const insetX = cellW*outer + cellW*gutter*0.5;
         const insetY = cellH*outer + cellH*gutter*0.5;
         pctx.strokeRect(x+insetX, y+insetY, cellW-insetX*2, cellH-insetY*2);
@@ -557,6 +620,14 @@
 
   removeBg.addEventListener('change', ()=>{ tolRow.style.opacity = removeBg.checked ? 1 : .35; });
   tol.addEventListener('input', ()=> tolVal.textContent = tol.value);
+  pad.addEventListener('input', ()=> padVal.textContent = pad.value);
+  fitRatio.addEventListener('change', drawPreviewOverlay);
+  captionPos.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+    captionPos.querySelectorAll('button').forEach(x=> x.classList.remove('active'));
+    b.classList.add('active');
+    captionPosition = b.dataset.pos;
+    rerenderAllCaptions();
+  }));
 
   resetBtn.addEventListener('click', ()=>{
     sourceImg = null; previewArea.classList.remove('show'); fileInput.value='';
@@ -565,7 +636,7 @@
   // ---------- Step 3: crop + process ----------
   const stickerGrid = document.getElementById('stickerGrid');
   const zipBtn = document.getElementById('zipBtn');
-  let stickerBlobs = []; // {blob, name}
+  let stickers = []; // {order, name, base, caption, blob, url, imgEl}
 
   // flood-fill transparency from edges based on background color similarity
   function removeBackground(canvas, tolerance){
@@ -644,9 +715,9 @@
       }
     }
 
-    // fit within LINE 370x320, keep aspect ratio, add safe margin
+    // fit within LINE 370x320, keep aspect ratio, with mandatory whitespace
     const MAXW = 370, MAXH = 320;
-    const margin = evenMargin.checked ? 10 : 0;
+    const margin = parseInt(pad.value, 10);   // 必須留白
     const availW = MAXW - margin*2, availH = MAXH - margin*2;
     const cw = cropped.width, ch = cropped.height;
     const scale = Math.min(availW/cw, availH/ch);
@@ -666,10 +737,55 @@
     return out;
   }
 
+  // draw a caption onto a copy of the base sticker; returns a new canvas
+  function renderSticker(base, caption){
+    const out = document.createElement('canvas');
+    out.width = base.width; out.height = base.height;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(base, 0, 0);
+
+    caption = (caption || '').trim();
+    if(!caption || captionPosition === 'none') return out;
+
+    const W = out.width, H = out.height;
+    // font size scales with sticker width, shrinks if text is long
+    let fontSize = Math.round(W * 0.16);
+    fontSize = Math.max(16, Math.min(fontSize, Math.round(W * 0.9 / Math.max(caption.length, 1) * 1.6)));
+    ctx.font = '700 ' + fontSize + 'px "Noto Sans TC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = captionPosition === 'top' ? 'top' : 'bottom';
+    const x = W / 2;
+    const inset = Math.max(6, Math.round(H * 0.04));
+    const y = captionPosition === 'top' ? inset : H - inset;
+
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = Math.max(3, fontSize * 0.22);
+    ctx.strokeStyle = '#ffffff';
+    ctx.strokeText(caption, x, y);
+    ctx.fillStyle = '#4b3a30';
+    ctx.fillText(caption, x, y);
+    return out;
+  }
+
+  // re-render one sticker's PNG (base + caption) and refresh its card + blob
+  function updateSticker(s){
+    if(s.url) URL.revokeObjectURL(s.url);
+    const rendered = renderSticker(s.base, s.caption);
+    s.idxLabel.textContent = rendered.width + '×' + rendered.height + ' px';
+    rendered.toBlob(blob=>{
+      if(s.url) URL.revokeObjectURL(s.url);
+      s.blob = blob;
+      s.url = URL.createObjectURL(blob);
+      s.imgEl.src = s.url;
+    }, 'image/png');
+  }
+
+  function rerenderAllCaptions(){ stickers.forEach(updateSticker); }
+
   function process(){
     if(!sourceImg) return;
     const {n, m} = getNM();
-    const total = n*m;
     const outer = parseInt(trimOuter.value,10)/100;
     const gutter = parseInt(trimGutter.value,10)/100;
 
@@ -678,25 +794,26 @@
     src.width = sourceImg.width; src.height = sourceImg.height;
     src.getContext('2d').drawImage(sourceImg,0,0);
 
-    const cellW = sourceImg.width / n;
-    const cellH = sourceImg.height / m;
+    // crop the sheet to the correct target ratio, THEN slice into n×m cells
+    const cr = getCropRect(sourceImg.width, sourceImg.height, n, m);
+    const cellW = cr.cw / n;
+    const cellH = cr.ch / m;
 
+    stickers.forEach(s=>{ if(s.url) URL.revokeObjectURL(s.url); });
     stickerGrid.innerHTML = '';
-    stickerBlobs = [];
+    stickers = [];
     processBtn.disabled = true;
     processBtn.textContent = '⏳ 處理中…';
 
-    let pending = total;
     let count = 0;
-
     for(let r=0;r<m;r++){
       for(let c=0;c<n;c++){
         count++;
         const idx = count;
         const insetX = cellW*outer + cellW*gutter*0.5;
         const insetY = cellH*outer + cellH*gutter*0.5;
-        const sx = c*cellW + insetX;
-        const sy = r*cellH + insetY;
+        const sx = cr.cx + c*cellW + insetX;
+        const sy = cr.cy + r*cellH + insetY;
         const sw = cellW - insetX*2;
         const sh = cellH - insetY*2;
 
@@ -705,7 +822,7 @@
         cell.height = Math.max(2, Math.round(sh));
         cell.getContext('2d').drawImage(src, sx, sy, sw, sh, 0,0, cell.width, cell.height);
 
-        const finalCanvas = makeStickerCanvas(cell);
+        const base = makeStickerCanvas(cell);
         const name = 'sticker_' + String(idx).padStart(2,'0') + '.png';
 
         // build card
@@ -720,30 +837,36 @@
         dl.textContent = '⬇ 下載 PNG';
         const idxLabel = document.createElement('div');
         idxLabel.className = 'idx';
-        idxLabel.textContent = finalCanvas.width + '×' + finalCanvas.height + ' px';
-        card.appendChild(thumb); card.appendChild(dl); card.appendChild(idxLabel);
+        const capInput = document.createElement('input');
+        capInput.className = 'caption-input';
+        capInput.type = 'text';
+        capInput.placeholder = '輸入配文…';
+        capInput.maxLength = 14;
+        card.appendChild(thumb); card.appendChild(capInput);
+        card.appendChild(dl); card.appendChild(idxLabel);
         stickerGrid.appendChild(card);
 
-        finalCanvas.toBlob(blob=>{
-          const url = URL.createObjectURL(blob);
-          imgEl.src = url;
-          stickerBlobs.push({blob, name, order: idx});
-          dl.addEventListener('click', ()=>{
-            const a = document.createElement('a');
-            a.href = url; a.download = name; a.click();
-          });
-          pending--;
-          if(pending===0) finishProcess();
-        }, 'image/png');
+        const s = {order: idx, name, base, caption: '', blob: null, url: null, imgEl, idxLabel};
+        stickers.push(s);
+
+        capInput.addEventListener('input', ()=>{ s.caption = capInput.value; updateSticker(s); });
+        dl.addEventListener('click', ()=>{
+          if(!s.url) return;
+          const a = document.createElement('a');
+          a.href = s.url; a.download = s.name; a.click();
+        });
+
+        updateSticker(s);
       }
     }
+    finishProcess();
   }
 
   function finishProcess(){
-    stickerBlobs.sort((a,b)=>a.order-b.order);
+    stickers.sort((a,b)=>a.order-b.order);
     processBtn.disabled = false;
     processBtn.textContent = '✂️ 開始裁切成貼圖';
-    zipBtn.disabled = stickerBlobs.length===0 || typeof JSZip==='undefined';
+    zipBtn.disabled = stickers.length===0 || typeof JSZip==='undefined';
     document.querySelector('.step:last-of-type').scrollIntoView({behavior:'smooth', block:'start'});
   }
 
@@ -787,11 +910,11 @@
   })();
 
   zipBtn.addEventListener('click', async ()=>{
-    if(typeof JSZip==='undefined' || !stickerBlobs.length) return;
+    if(typeof JSZip==='undefined' || !stickers.length) return;
     zipBtn.disabled = true; const orig = zipBtn.textContent; zipBtn.textContent='📦 打包中…';
     const zip = new JSZip();
     const folder = zip.folder('line_stickers');
-    stickerBlobs.forEach(s=> folder.file(s.name, s.blob));
+    stickers.forEach(s=>{ if(s.blob) folder.file(s.name, s.blob); });
     const content = await zip.generateAsync({type:'blob'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(content);
