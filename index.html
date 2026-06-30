@@ -378,7 +378,11 @@
     <p class="step-desc">每張都是符合 LINE 規範的透明 PNG（最大 370×320、偶數尺寸）。可在每張下方輸入「配文」，文字會即時合成進圖片，再逐張下載或一次打包。</p>
 
     <div class="btn-row">
-      <button class="btn btn-primary" id="zipBtn" disabled>📦 全部打包下載（ZIP）</button>
+      <button class="btn btn-primary" id="shareAllBtn" disabled style="display:none;">📲 全部儲存到相簿</button>
+      <button class="btn btn-ghost" id="zipBtn" disabled>📦 全部打包下載（ZIP）</button>
+    </div>
+    <div class="tip" id="mobileTip" style="display:none;">
+      📱 <b>手機請按「儲存到相簿」</b>：跳出選單後選「<b>儲存影像 / Save Image</b>」，貼圖才會進到相簿，LINE 拍貼才讀得到（用「下載」會存到檔案 App，拍貼看不到）。
     </div>
 
     <div id="stickerGrid" class="sticker-grid">
@@ -386,7 +390,7 @@
     </div>
 
     <div class="tip" style="margin-top:18px;">
-      📲 <b>匯入 LINE 拍貼：</b>下載貼圖到手機 → 打開「LINE 拍貼」App →「製作貼圖」→ 選擇「自訂貼圖」→ 從相簿選入剛下載的 PNG → 依序加入即可送審或自用。
+      📲 <b>匯入 LINE 拍貼：</b>先用上面的「儲存到相簿」把貼圖存進手機相簿 → 打開「LINE 拍貼」App →「製作貼圖」→「自訂貼圖」→ 從相簿選入貼圖 → 依序加入即可送審或自用。
     </div>
   </section>
 
@@ -636,7 +640,31 @@
   // ---------- Step 3: crop + process ----------
   const stickerGrid = document.getElementById('stickerGrid');
   const zipBtn = document.getElementById('zipBtn');
+  const shareAllBtn = document.getElementById('shareAllBtn');
+  const mobileTip = document.getElementById('mobileTip');
   let stickers = []; // {order, name, base, caption, blob, url, imgEl}
+
+  // can this device share image files to the native sheet (→ "儲存到相簿")?
+  const canShareFiles = (function(){
+    try{
+      if(typeof navigator.canShare !== 'function') return false;
+      const f = new File([new Blob(['x'], {type:'image/png'})], 't.png', {type:'image/png'});
+      return navigator.canShare({files:[f]});
+    }catch(e){ return false; }
+  })();
+  if(canShareFiles){ shareAllBtn.style.display = ''; mobileTip.style.display = ''; }
+
+  async function saveSticker(s){
+    if(!s.blob) return;
+    if(canShareFiles){
+      try{
+        await navigator.share({files:[new File([s.blob], s.name, {type:'image/png'})], title: s.name});
+        return;
+      }catch(err){ if(err && err.name === 'AbortError') return; /* else fall back */ }
+    }
+    const a = document.createElement('a');
+    a.href = s.url; a.download = s.name; a.click();
+  }
 
   // flood-fill transparency from edges based on background color similarity
   function removeBackground(canvas, tolerance){
@@ -834,7 +862,7 @@
         thumb.appendChild(imgEl);
         const dl = document.createElement('button');
         dl.className = 'mini-dl';
-        dl.textContent = '⬇ 下載 PNG';
+        dl.textContent = canShareFiles ? '📲 儲存到相簿' : '⬇ 下載 PNG';
         const idxLabel = document.createElement('div');
         idxLabel.className = 'idx';
         const capInput = document.createElement('input');
@@ -850,11 +878,7 @@
         stickers.push(s);
 
         capInput.addEventListener('input', ()=>{ s.caption = capInput.value; updateSticker(s); });
-        dl.addEventListener('click', ()=>{
-          if(!s.url) return;
-          const a = document.createElement('a');
-          a.href = s.url; a.download = s.name; a.click();
-        });
+        dl.addEventListener('click', ()=> saveSticker(s));
 
         updateSticker(s);
       }
@@ -867,8 +891,21 @@
     processBtn.disabled = false;
     processBtn.textContent = '✂️ 開始裁切成貼圖';
     zipBtn.disabled = stickers.length===0 || typeof JSZip==='undefined';
+    shareAllBtn.disabled = stickers.length===0 || !canShareFiles;
     document.querySelector('.step:last-of-type').scrollIntoView({behavior:'smooth', block:'start'});
   }
+
+  shareAllBtn.addEventListener('click', async ()=>{
+    const files = stickers.filter(s=>s.blob).map(s=> new File([s.blob], s.name, {type:'image/png'}));
+    if(!files.length) return;
+    // some devices cap how many files can be shared at once — chunk if needed
+    if(navigator.canShare && navigator.canShare({files})){
+      try{ await navigator.share({files, title:'LINE 貼圖'}); }
+      catch(err){ if(err && err.name === 'AbortError') return; }
+      return;
+    }
+    alert('這台裝置無法一次分享這麼多張，請改用每張的「儲存到相簿」逐張存，或用電腦版「打包下載」。');
+  });
 
   processBtn.addEventListener('click', process);
 
